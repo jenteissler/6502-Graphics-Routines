@@ -1,38 +1,89 @@
 ; Bressenham Line drawing
 
-LDA #3
-STA $00 ; x0 
-LDA #4
-STA $01 ; y0
-LDA #30
-STA $02 ; x1
-LDA #20
-STA $03 ; y1
+LDA #30; x0 
+STA $00 
+LDA #04 ; y0
+STA $01
+LDA #03 ; x1
+STA $02
+LDA #20 ; y1
+STA $03
 
 JSR draw_line
 JMP exit
 
 draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1
+  LDA #1
+  STA $06 ; x counter
+  STA $07 ; y counter
+
+  LDA $00
+  CMP $02
+  BCC dl_no_x_swap
+  LDA $00
+  PHA
+  LDA $02
+  STA $00
+  PLA
+  STA $02
+  dl_no_x_swap:
+
+  LDA $01
+  CMP $03
+  BCC dl_no_y_swap
+  LDA $01
+  PHA
+  LDA $03
+  STA $01
+  PLA
+  STA $03
+  dl_no_y_swap:
+
   CLC
   LDA $02
-  SBC $00
-  STA $04 ; dx = x1 - x0
+  SBC $00  ; dx = x1 - x0
+  ;BPL dl_dx_positive 
+  ;JSR twos_complement ; correct negative delta
+  ;PHA
+  ;LDA #$FF ; set x counter to -1
+  ;STA $06
+  ;PLA
+  ;dl_dx_positive:
+  STA $04
 
   CLC
   LDA $03
-  SBC $01
-  STA $03 ; dy = y1 - y0
+  SBC $01 ; dy = y1 - y0
+  ;BPL dl_dy_positive
+  ;JSR twos_complement ; correct negative delta
+  ;PHA
+  ;LDA #$FF ; set y counter to -1
+  ;STA $07
+  ;PLA
+  ;dl_dy_positive:
+  STA $03
+
+  ; if dy greater swap?
+  ;CMP $04
+  ;BCC dl_swap_skip
+  ;PHA 
+  ;LDA $03
+  ;STA $04
+  ;PLA
+  ;STA $03
+  ;dl_swap_skip:
+
 
   CLC
   ASL A
   SBC $04
-  STA $05 ; E = 2dy - dx
+  STA $05 ; E = 2dy - dx 
 
   CLC
   LDA $03
   SBC $04
   ASL A
-  STA $04 ; k = 2 (dy - dx)
+  STA $04 ; k = 2 (dy - dx) 
 
   ASL $03 ; i = 2dy
 
@@ -40,8 +91,9 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1
   LDY $01
   LDA $05
 
+; loop should be whichever delta is greater
   dl_loop:
-    PHA ; push registeres to stack
+    PHA ; push registers to stack
     TXA
     PHA
     TYA
@@ -53,21 +105,32 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1
     TAX 
     PLA
 
-    CMP #0
-    BCC dll_error_k
-
-    CLC ; E < 0 
-    INY ; y = y + 1
+    CMP #0 ; E < 0
+    BMI dll_error_i 
+    PHA ; error (k) E > 0
+    TYA
+    CLC
+    ADC $07 ; y = y +- 1
+    TAY
+    PLA
+    ;INY
+    CLC
     ADC $04 ; E = E + k
-    JMP dll_error_i
+    JMP dll_error_skip
 
-    dll_error_k: ; E > 0
+    dll_error_i: ; error (i) E > 0
     ADC $03 ; E = E + i
-    dll_error_i:
+    dll_error_skip:
+    PHA
+    TXA
+    CLC
+    ADC $06 ; x = x +- 1
+    TAX
+    PLA
+    ;INX
 
-    INX ; ++x
     CPX $02
-    BCC dl_loop
+    BCC dl_loop ; 
   RTS
 
 draw_pixel: ; X = [0,31], Y = [0,31]
@@ -92,5 +155,15 @@ draw_pixel: ; X = [0,31], Y = [0,31]
   LDY #0
   STA ($10),Y 
   RTS
+
+twos_complement:
+  EOR #$FF
+  SEC
+  ADC #0
+  RTS
+
+multiply_unsigned:
+  
+
 
 exit:
