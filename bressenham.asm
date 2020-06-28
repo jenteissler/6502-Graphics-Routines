@@ -14,64 +14,81 @@ JMP exit
 
 draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1
   LDA #1
-  STA $06 ; x counter
-  STA $07 ; y counter
+  STA $06 ; initialize x counter
+  STA $07 ; initialize y counter
+  STA $08 ; initalize slope flag
 
-  LDA $00
-  CMP $02
-  BCC dl_no_x_swap
-  LDA $00
-  PHA
-  LDA $02
-  STA $00
-  PLA
-  STA $02
-  dl_no_x_swap:
+; swap start and end coords if any delta is negative
+;  LDA $00
+;  CMP $02
+;  BCC dl_no_x_swap
+ ; LDA $00
+ ; PHA
+;  LDA $02
+;  STA $00
+;  PLA
+;  STA $02
+;  dl_no_x_swap:
 
-  LDA $01
-  CMP $03
-  BCC dl_no_y_swap
-  LDA $01
-  PHA
-  LDA $03
-  STA $01
-  PLA
-  STA $03
-  dl_no_y_swap:
+;  LDA $01
+ ; CMP $03
+;  BCC dl_no_y_swap
+;  LDA $01
+;  PHA
+;  LDA $03
+ ; STA $01
+  ;PLA
+  ;STA $03
+  ;dl_no_y_swap:
+  ; END CHANGE
 
   CLC
   LDA $02
   SBC $00  ; dx = x1 - x0
-  ;BPL dl_dx_positive 
-  ;JSR twos_complement ; correct negative delta
+  BPL dl_dx_positive 
+  JSR twos_complement ; correct negative delta
+  LDX #$FF
+  STA $06
   ;PHA
   ;LDA #$FF ; set x counter to -1
   ;STA $06
   ;PLA
-  ;dl_dx_positive:
+  dl_dx_positive:
   STA $04
 
   CLC
   LDA $03
+  TAY ; save y1
   SBC $01 ; dy = y1 - y0
-  ;BPL dl_dy_positive
-  ;JSR twos_complement ; correct negative delta
+  BPL dl_dy_positive
+  JSR twos_complement ; correct negative delta
+  STX $07
   ;PHA
   ;LDA #$FF ; set y counter to -1
   ;STA $07
   ;PLA
-  ;dl_dy_positive:
+  dl_dy_positive:
   STA $03
 
   ; if dy greater swap?
-  ;CMP $04
-  ;BCC dl_swap_skip
-  ;PHA 
-  ;LDA $03
-  ;STA $04
-  ;PLA
-  ;STA $03
-  ;dl_swap_skip:
+  CMP $04
+  BCC dl_swap_skip
+  STY $02 ; set y as end loop
+
+  LDX $04 ; swap dy and dx
+  STA $04
+  STX $03
+
+  LDY $07 ; swap x and y counters
+  LDX $06
+  STY $06
+  STX $07
+
+  LDX #0 ; set slope flag
+  STX $08
+
+
+  dl_swap_skip:
 
 
   CLC
@@ -98,6 +115,18 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1
     PHA
     TYA
     PHA
+
+    LDA #1
+    CMP $08
+    BEQ dll_invert_skip
+    TXA
+    PHA
+    TYA
+    TAX
+    PLA
+    TAY
+    dll_invert_skip:
+
     JSR draw_pixel
     PLA ; pull registers from stack
     TAY 
@@ -130,7 +159,9 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1
     ;INX
 
     CPX $02
-    BCC dl_loop ; 
+    BEQ dl_loop_exit
+    JMP dl_loop ; 
+    dl_loop_exit:
   RTS
 
 draw_pixel: ; X = [0,31], Y = [0,31]
