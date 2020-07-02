@@ -1,26 +1,28 @@
 ; Bressenham Line drawing
 
-LDA #03; x0 
+LDA #03 ; x0 [#00 - #31]
 STA $00 
-LDA #04 ; y0
+LDA #04 ; y0 [#00 - #31]
 STA $01
-LDA #30 ; x1
+LDA #30 ; x1 [#00 - #31]
 STA $02
-LDA #20 ; y1
+LDA #20 ; y1 [#00 - #31]
 STA $03
+LDA #05 ; color [#00 - #15]
+STA $04
 
 JSR draw_line
 JMP exit
 
-draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1
+draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1, $04 = color
   LDA #0
-  STA $06 ; initialize x flag
-  STA $07 ; initialize y flag
-  STA $08 ; initialize slope flag
+  STA $07 ; initialize x flag
+  STA $08 ; initialize y flag
+  STA $09 ; initialize slope flag
 
   LDA $00
   CMP $02
-  BCC dl_x_complement ; take twos-complement of x1 & x0 if x1 < x0
+  BCC dl_x_complement ; take twos-complement of xs if x1 < x0
   LDA $00
   JSR twos_complement
   CLC
@@ -32,12 +34,12 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1
   ADC #31
   STA $02
   LDA #1
-  STA $06 ; set x flag
+  STA $07 ; set x flag
   dl_x_complement:
 
   LDA $01
   CMP $03
-  BCC dl_y_complement ; take twos-complement of y1 & y0 if y1 < y0
+  BCC dl_y_complement ; take twos-complement of ys if y1 < y0
   LDA $01
   JSR twos_complement
   CLC
@@ -49,13 +51,13 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1
   ADC #31
   STA $03
   LDA #1 
-  STA $07 ; set y flag
+  STA $08 ; set y flag
   dl_y_complement:
 
   CLC
   LDA $02
   SBC $00  ; dx = x1 - x0
-  STA $04
+  STA $05
 
   CLC
   LDA $03
@@ -64,42 +66,42 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1
   STA $03
 
   ; swap x and y to handle slope > 0.5
-  CMP $04
+  CMP $05
   BCC dl_slope
   BEQ dl_slope
   STY $02 ; set y as end loop
-  LDX $04 ; swap dy and dx
-  STA $04
+  LDX $05 ; swap dy and dx
+  STA $05
   STX $03
   LDX #1 ; set slope flag
-  STX $08
+  STX $09
   dl_slope:
 
   CLC
   ASL A
-  SBC $04
-  STA $05 ; E = 2dy - dx 
+  SBC $05
+  STA $06 ; E = 2dy - dx 
 
   CLC
   LDA $03
-  SBC $04
+  SBC $05
   ASL A
-  STA $04 ; k = 2 (dy - dx) 
+  STA $05 ; k = 2 (dy - dx) 
   ASL $03 ; i = 2dy
 
   LDX $00 ; transfer loop variables to registers
   LDY $01
-  LDA $05
+  LDA $06
 
   dl_loop:
-    PHA
+    PHA ; save register state
     TXA
     PHA
     TYA
     PHA
     JSR handle_flags
     JSR draw_pixel
-    PLA
+    PLA ; restore register state
     TAY 
     PLA
     TAX 
@@ -113,9 +115,8 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1
     ADC #1 ; y = y + 1
     TAY
     PLA
-    ;INY
     CLC
-    ADC $04 ; E = E + k
+    ADC $05 ; E = E + k
     JMP dll_error_skip
 
     dll_error_i: ; error (i) E > 0
@@ -129,9 +130,8 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1
     PLA
 
     CPX $02
-    BEQ dl_loop_exit
-    JMP dl_loop ; 
-    dl_loop_exit:
+    BCC dl_loop
+    BEQ dl_loop
   RTS
 
 draw_pixel: ; X = [0,31], Y = [0,31]
@@ -152,13 +152,13 @@ draw_pixel: ; X = [0,31], Y = [0,31]
   LDA $11
   ADC #$02 ; add display buffer offset
   STA $11
-  LDA #$1 ; color
+  LDA $04 ; color
   LDY #0
   STA ($10),Y 
   RTS
 
 handle_flags:
-  LDA $08
+  LDA $09
   CMP #0
   BEQ hf_end_slope
   TXA
@@ -169,7 +169,7 @@ handle_flags:
   TAY
   hf_end_slope:
 
-  LDA $06
+  LDA $07
   CMP #0
   BEQ hf_end_x
   TXA
@@ -179,7 +179,7 @@ handle_flags:
   TAX
   hf_end_x:
 
-  LDA $07
+  LDA $08
   CMP #0
   BEQ hf_end_y
   TYA 
@@ -195,23 +195,5 @@ twos_complement:
   SEC
   ADC #0
   RTS
-
-push_registers:
-  PHA
-  TXA
-  PHA
-  TYA
-  PHA
-  RTS
-
-pull_registers:
-  PLA
-  TAY 
-  PLA
-  TAX 
-  PLA
-  RTS
-
-
 
 exit:
