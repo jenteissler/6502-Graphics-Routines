@@ -1,12 +1,12 @@
 ; Bressenham Line drawing
 
-LDA #03 ; x0 [#00 - #31]
+LDA #10 ; x0 [#00 - #31]
 STA $00 
-LDA #04 ; y0 [#00 - #31]
+LDA #10 ; y0 [#00 - #31]
 STA $01
 LDA #30 ; x1 [#00 - #31]
 STA $02
-LDA #20 ; y1 [#00 - #31]
+LDA #10 ; y1 [#00 - #31]
 STA $03
 LDA #05 ; color [#00 - #15]
 STA $04
@@ -20,9 +20,11 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1, $04 = color
   STA $08 ; initialize y flag
   STA $09 ; initialize slope flag
 
+  ; collapse all calculations into the first quadrant
   LDA $00
   CMP $02
   BCC dl_x_complement ; take twos-complement of xs if x1 < x0
+  BEQ dl_x_complement
   LDA $00
   JSR twos_complement
   CLC
@@ -40,6 +42,7 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1, $04 = color
   LDA $01
   CMP $03
   BCC dl_y_complement ; take twos-complement of ys if y1 < y0
+  BEQ dl_y_complement
   LDA $01
   JSR twos_complement
   CLC
@@ -65,8 +68,8 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1, $04 = color
   SBC $01 ; dy = y1 - y0
   STA $03
 
-  ; swap x and y to handle slope > 0.5
-  CMP $05
+  ; collapse all calculations into the first octant
+  CMP $05 ; dy <= dx ?
   BCC dl_slope
   BEQ dl_slope
   STY $02 ; set y as end loop
@@ -109,25 +112,16 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1, $04 = color
 
     CMP #0 ; E < 0
     BMI dll_error_i 
-    PHA ; error (k) E > 0
-    TYA
-    CLC
-    ADC #1 ; y = y + 1
-    TAY
-    PLA
+    PHA ; error (k) E >= 0
+    INY
     CLC
     ADC $05 ; E = E + k
     JMP dll_error_skip
 
-    dll_error_i: ; error (i) E > 0
+    dll_error_i: ; error (i) E < 0
     ADC $03 ; E = E + i
     dll_error_skip:
-    PHA
-    TXA
-    CLC
-    ADC #1 ; x = x + 1
-    TAX
-    PLA
+    INX
 
     CPX $02
     BCC dl_loop
@@ -157,11 +151,11 @@ draw_pixel: ; X = [0,31], Y = [0,31]
   STA ($10),Y 
   RTS
 
-handle_flags:
+handle_flags: 
   LDA $09
   CMP #0
-  BEQ hf_end_slope
-  TXA
+  BEQ hf_end_slope ; swap x and y if slope flag set
+  TXA 
   PHA
   TYA
   TAX
@@ -171,7 +165,7 @@ handle_flags:
 
   LDA $07
   CMP #0
-  BEQ hf_end_x
+  BEQ hf_end_x ; twos-complement x value if x flag set
   TXA
   JSR twos_complement
   CLC
@@ -181,7 +175,7 @@ handle_flags:
 
   LDA $08
   CMP #0
-  BEQ hf_end_y
+  BEQ hf_end_y ; twos-complement x value if x flag set
   TYA 
   JSR twos_complement
   CLC
