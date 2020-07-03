@@ -15,28 +15,59 @@ JSR draw_line
 JMP exit
 
 draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1, $04 = color
+  CLC
+  LDA $02
+  SBC $00  ; dx = x1 - x0
+  BVC dl_x_pos
+  JSR twos_complement
+  STA $07
+  dl_x_pos:
+
+  CLC
+  LDA $01
+  SBC $03  ; dx = y1 - x1
+  BVC dl_y_pos
+  JSR twos_complement
+  dl_y_pos:
+
+  CMP $07
+  BCC dl_slope_normal
+  LDX $00
+  LDY $01
+  STY $00
+  STX $01
+  LDX $02
+  LDY $03
+  STY $02
+  STX $03
+  dl_slope_normal:
+
   LDA #0
   STA $07 ; initialize x flag
   STA $08 ; initialize y flag
   STA $09 ; initialize slope flag
 
+
+
+
+
   ; collapse all calculations into the first quadrant
-  ;LDA $00
-  ;CMP $02
-  ;BCC dl_x_complement ; take twos-complement of xs if x1 < x0
-  ;BEQ dl_x_complement
-  ;LDA $00
-  ;JSR twos_complement
-  ;CLC
-  ;ADC #31
-  ;STA $00
-  ;LDA $02
-  ;JSR twos_complement
-  ;CLC
-  ;ADC #31
-  ;STA $02
-  ;LDA #1
-  ;STA $07 ; set x flag
+  LDA $00
+  CMP $02
+  BCC dl_x_complement ; take twos-complement of xs if x1 < x0
+  BEQ dl_x_complement
+  LDA $00
+  JSR twos_complement
+  CLC
+  ADC #31
+  STA $00
+  LDA $02
+  JSR twos_complement
+  CLC
+  ADC #31
+  STA $02
+  LDA #1
+  STA $07 ; set x flag
   dl_x_complement:
 
   LDA $01
@@ -122,6 +153,7 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1, $04 = color
     JMP dll_error_skip
 
     dll_error_i: ; error (i) E < 0
+    CLC
     ADC $03 ; E = E + i
     dll_error_skip:
     INX
@@ -154,16 +186,16 @@ draw_pixel: ; X = [0,31], Y = [0,31]
   RTS
 
 handle_flags: 
-  ;LDA $09
-  ;CMP #0
-  ;BEQ hf_end_slope ; swap x and y if slope flag set
-  ;TXA 
-  ;PHA
-  ;TYA
-  ;TAX
-  ;PLA
-  ;TAY
-  ;hf_end_slope:
+  LDA $09
+  CMP #0
+  BEQ hf_end_slope ; swap x and y if slope flag set
+  TXA 
+  PHA
+  TYA
+  TAX
+  PLA
+  TAY
+  hf_end_slope:
 
   LDA $08
   CMP #0
@@ -175,15 +207,15 @@ handle_flags:
   TAY
   hf_end_y:
 
-  ;LDA $07
-  ;CMP #0
-  ;BEQ hf_end_x ; twos-complement x value if x flag set
-  ;TXA
-  ;JSR twos_complement
-  ;CLC
-  ;ADC #31
-  ;TAX
-  ;hf_end_x:
+  LDA $07
+  CMP #0
+  BEQ hf_end_x ; twos-complement x value if x flag set
+  TXA
+  JSR twos_complement
+  CLC
+  ADC #31
+  TAX
+  hf_end_x:
   RTS
 
 twos_complement:
