@@ -2,11 +2,11 @@
 
 LDA #10 ; x0 [#00 - #31]
 STA $00 
-LDA #15 ; y0 [#00 - #31]
+LDA #10 ; y0 [#00 - #31]
 STA $01
-LDA #20 ; x1 [#00 - #31]
+LDA #30 ; x1 [#00 - #31]
 STA $02
-LDA #10 ; y1 [#00 - #31]
+LDA #20 ; y1 [#00 - #31]
 STA $03
 LDA #05 ; color [#00 - #15]
 STA $04
@@ -15,23 +15,32 @@ JSR draw_line
 JMP exit
 
 draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1, $04 = color
-  CLC
-  LDA $02
-  SBC $00  ; dx = x1 - x0
-  BVC dl_x_pos
-  JSR twos_complement
-  STA $07
-  dl_x_pos:
+  LDA #0
+  STA $07 ; initialize x flag
+  STA $08 ; initialize y flag
+  STA $09 ; initialize slope flag
 
-  CLC
-  LDA $01
-  SBC $03  ; dx = y1 - x1
-  BVC dl_y_pos
+
+  LDA $02
+  SEC
+  SBC $00  ; dx = x1 - x0
+  BPL dl_x_pos
+  JSR twos_complement
+  dl_x_pos:
+  STA $05
+  LDX #1
+
+  LDA $03
+  SEC
+  SBC $01  ; dy = y1 - y0
+  BPL dl_y_pos
   JSR twos_complement
   dl_y_pos:
+  LDX #2
 
-  CMP $07
+  CMP $05
   BCC dl_slope_normal
+  LDX #3
   LDX $00
   LDY $01
   STY $00
@@ -40,13 +49,10 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1, $04 = color
   LDY $03
   STY $02
   STX $03
+  LDX #1 ; set slope flag
+  STX $09
   dl_slope_normal:
-
-  LDA #0
-  STA $07 ; initialize x flag
-  STA $08 ; initialize y flag
-  STA $09 ; initialize slope flag
-
+  LDX #4
 
 
 
@@ -88,37 +94,25 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1, $04 = color
   STA $08 ; set y flag
   dl_y_complement:
 
-  CLC
+  
   LDA $02
+  SEC
   SBC $00  ; dx = x1 - x0
   STA $05
 
-  CLC
   LDA $03
   TAY ; save y1 to set as loop end
-  CLC
+  SEC
   SBC $01 ; dy = y1 - y0
   STA $03
 
-  ; collapse all calculations into the first octant
-  ;CMP $05 ; dy <= dx ?
-  ;BCC dl_slope
-  ;BEQ dl_slope
-  ;STY $02 ; set y as end loop
-  ;LDX $05 ; swap dy and dx
-  ;STA $05
-  ;STX $03
-  ;LDX #1 ; set slope flag
-  ;STX $09
-  ;dl_slope:
-
-  CLC
   ASL A
+  SEC
   SBC $05
   STA $06 ; E = 2dy - dx 
 
-  CLC
   LDA $03
+  SEC
   SBC $05
   ASL A
   STA $05 ; k = 2 (dy - dx) 
@@ -186,16 +180,7 @@ draw_pixel: ; X = [0,31], Y = [0,31]
   RTS
 
 handle_flags: 
-  LDA $09
-  CMP #0
-  BEQ hf_end_slope ; swap x and y if slope flag set
-  TXA 
-  PHA
-  TYA
-  TAX
-  PLA
-  TAY
-  hf_end_slope:
+  
 
   LDA $08
   CMP #0
@@ -216,6 +201,18 @@ handle_flags:
   ADC #31
   TAX
   hf_end_x:
+
+  LDA $09
+  CMP #0
+  BEQ hf_end_slope ; swap x and y if slope flag set
+  TXA 
+  PHA
+  TYA
+  TAX
+  PLA
+  TAY
+  hf_end_slope:
+  
   RTS
 
 twos_complement:
