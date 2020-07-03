@@ -139,8 +139,7 @@ draw_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1, $04 = color
     PLA
 
     CMP #0 ; E < 0
-    BMI dll_error_i 
-    PHA ; error (k) E >= 0
+    BMI dll_error_i ; error (k) E >= 0
     INY
     CLC
     ADC $05 ; E = E + k
