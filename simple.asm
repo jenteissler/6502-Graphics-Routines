@@ -1,47 +1,43 @@
-; Bressenham Line drawing
+; Simple Line drawing
 
 LDA #10 ; x0 [#00 - #31]
 STA $00 
 LDA #10 ; y0 [#00 - #31]
 STA $01
-LDA #30 ; x1 [#00 - #31]
+LDA #12 ; x1 [#00 - #31]
 STA $02
-LDA #20 ; y1 [#00 - #31]
+LDA #13 ; y1 [#00 - #31]
 STA $03
 LDA #05 ; color [#00 - #15]
 STA $04
 
-JSR draw_bressenham_line
+JSR draw_simple_line
 JMP exit
 
-draw_bressenham_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1, $04 = color
+draw_simple_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1, $04 = color
   LDA #0
   STA $07 ; initialize x flag
   STA $08 ; initialize y flag
   STA $09 ; initialize slope flag
 
-
   LDA $02
   SEC
   SBC $00  ; dx = x1 - x0
-  BPL dbl_x_pos
+  BPL dsl_x_pos
   JSR twos_complement
-  dbl_x_pos:
+  dsl_x_pos:
   STA $05
-  LDX #1
 
   LDA $03
   SEC
   SBC $01  ; dy = y1 - y0
-  BPL dbl_y_pos
+  BPL dsl_y_pos
   JSR twos_complement
-  dbl_y_pos:
-  LDX #2
+  dsl_y_pos:
 
   ; collapse all calculations into odd octants
   CMP $05
-  BCC dbl_slope_normal
-  LDX #3
+  BCC dsl_slope_normal
   LDX $00
   LDY $01
   STY $00
@@ -52,14 +48,13 @@ draw_bressenham_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1, $04 = color
   STX $03
   LDX #1 ; set slope flag
   STX $09
-  dbl_slope_normal:
-  LDX #4
+  dsl_slope_normal:
 
   ; collapse all calculations into the first octant
   LDA $00
   CMP $02
-  BCC dbl_x_complement ; take twos-complement of xs if x1 < x0
-  BEQ dbl_x_complement
+  BCC dsl_x_complement ; take twos-complement of xs if x1 < x0
+  BEQ dsl_x_complement
   LDA $00
   JSR twos_complement
   CLC
@@ -72,12 +67,12 @@ draw_bressenham_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1, $04 = color
   STA $02
   LDA #1
   STA $07 ; set x flag
-  dbl_x_complement:
+  dsl_x_complement:
 
   LDA $01
   CMP $03
-  BCC dbl_y_complement ; take twos-complement of ys if y1 < y0
-  BEQ dbl_y_complement
+  BCC dsl_y_complement ; take twos-complement of ys if y1 < y0
+  BEQ dsl_y_complement
   LDA $01
   JSR twos_complement
   CLC
@@ -90,66 +85,117 @@ draw_bressenham_line: ; $00 = x0, $01 = y0, $02 = x1, $03 = y1, $04 = color
   STA $03
   LDA #1 
   STA $08 ; set y flag
-  dbl_y_complement:
-  
+  dsl_y_complement:
+
   LDA $02
   SEC
   SBC $00  ; dx = x1 - x0
   STA $05
 
   LDA $03
-  TAY ; save y1 to set as loop end
   SEC
   SBC $01 ; dy = y1 - y0
   STA $03
 
-  ASL A
-  SEC
-  SBC $05
-  STA $06 ; E = 2dy - dx 
-
+; convert data into floating point numbers
+  LDA #0
+  STA $16
   LDA $03
-  SEC
-  SBC $05
-  ASL A
-  STA $05 ; k = 2 (dy - dx) 
-  ASL $03 ; i = 2dy
+  STA $17
+  JSR FLOAT
+  LDA $15 ; store dy
+  STA $30
+  LDA $16
+  STA $31
+  LDA $17
+  STA $32
+  LDA $18
+  STA $33 ; dy = $30
 
-  LDX $00 ; transfer loop variables to registers
+  LDA #0
+  STA $16
+  LDA $05
+  STA $17
+  JSR FLOAT ; dx = $15
+
+  LDA $30 ; load dy
+  STA $11
+  LDA $31
+  STA $12
+  LDA $32
+  STA $13
+  LDA $33
+  STA $14
+  JSR FDIV ; calculate slope
+  LDA $15
+  STA $30
+  LDA $16
+  STA $31
+  LDA $17
+  STA $32
+  LDA $18
+  STA $33 ; dy/dx = $30
+
+  LDY #00
+  STY $16
   LDY $01
-  LDA $06
+  STY $17
+  JSR FLOAT
+  LDA $15
+  STA $34
+  LDA $16
+  STA $35
+  LDA $17
+  STA $36
+  LDA $18
+  STA $37 ; y = $34
 
-  dbl_loop:
-    CPX $02
-    BCS dbl_loop_end
-    PHA ; save register state
+  LDX $00 ; x
+
+  dsl_loop:
     TXA
-    PHA
-    TYA
-    PHA
+    PHA ; save register state
+
+    LDA $30 ; load slope
+    STA $15
+    LDA $31
+    STA $16
+    LDA $32
+    STA $17
+    LDA $33
+    STA $18
+    LDA $34 ; load y
+    STA $11
+    LDA $35
+    STA $12
+    LDA $36
+    STA $13
+    LDA $37
+    STA $14
+    JSR FADD ; y += slope
+    LDA $15
+    STA $34
+    LDA $16
+    STA $35
+    LDA $17
+    STA $36
+    LDA $18
+    STA $37
+    JSR FIX ; convert y to integer
+
+    LDY $17 ; pass y param
+    PLA 
+    TAX     ; pass x param
+    PHA     ; save register
     JSR handle_flags
     JSR draw_pixel
-    PLA ; restore register state
-    TAY 
     PLA
-    TAX 
-    PLA
-
-    CMP #0 ; E < 0
-    BMI dbll_error_i ; error (k) E >= 0
-    INY
-    CLC
-    ADC $05 ; E = E + k
-    JMP dbll_error_skip
-
-    dbll_error_i: ; error (i) E < 0
-    CLC
-    ADC $03 ; E = E + i
-    dbll_error_skip:
+    TAX ; restore register
+    
     INX
-
-    JMP dbl_loop
-    dbl_loop_end:
+    CPX $02
+    BCC dsl_loop
+    BEQ dsl_loop
   RTS
              
 draw_pixel: ; X = [0,31], Y = [0,31]
