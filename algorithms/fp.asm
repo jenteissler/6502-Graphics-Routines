@@ -1,0 +1,197 @@
+; Extract from Dr.Dobb's Journal, August 1976 (pages 17-19)
+; Authors: Roy Rankin & Steve Wozniak
+; Modified by Jennifer Teissler
+
+;     BASIC FLOATING POINT ROUTINES
+;     FLOAT - (IN -> X1, M1)
+;     FIX   - (X1, M1 -> IN)
+;     FADD  - (X1, M1, X2, M2 -> X1, M1)
+;     FSUB  - (X1, M1, X2, M2 -> X1, M1)
+;     FMUL  - (X1, M1, X2, M2 -> X1, M1)
+;     FDIV  - (X1, M1, X2, M2 -> X1, M1)
+      
+; (X1) Exponent 1: $15
+; (M1) Mantissa 1: $16 - $18
+; (X2) Exponent 2: $11
+; (M2) Mantissa 2: $12 - $14
+; (IN)Integer    : $16 (high) $17 (low)
+; Scratch        : $19 - $1C
+; Sign           : $10
+
+ADD:    CLC         ; CLEAR CARRY
+        LDX #$02    ; INDEX FOR 3-BYTE ADD
+ADD1:   LDA $16,X   ; 
+        ADC $12,X   ; ADD A BYTE OF MANT2 TO MANT1
+        STA $16,X   ; 
+        DEX         ; ADVANCE INDEX TO NEXT MORE SIGNIF.BYTE
+        BPL ADD1    ; LOOP UNTIL DONE.
+        RTS         ; RETURN
+MD1:    ASL $10     ; CLEAR LSB OF $10
+        JSR ABSWAP  ; ABS VAL OF MANT1, THEN SWAP MANT2
+ABSWAP: BIT $16     ; MANT1 NEG?
+        BPL ABSWP1  ; NO,SWAP WITH MANT2 AND RETURN
+        JSR FCOMPL  ; YES, COMPLIMENT IT.
+        INC $10     ; INCR SIGN, COMPLEMENTING LSB
+ABSWP1: SEC         ; SET CARRY FOR RETURN TO MUL/DIV
+
+;     SWAP EXP/MANT1 WITH EXP/MANT2
+
+SWAP:   LDX #$04    ; INDEX FOR 4-BYTE SWAP.
+SWAP1:  STY $18,X   ; 
+        LDA $14,X   ; SWAP A BYTE OF EXP/MANT1 WITH
+        LDY $10,X   ; EXP/MANT2 AND LEAVEA COPY OF
+        STY $14,X   ; MANT1 IN E(3BYTES). E+3 USED.
+        STA $10,X   ; 
+        DEX         ; ADVANCE INDEX TO NEXT BYTE
+        BNE SWAP1   ; LOOP UNTIL DONE.
+        RTS         ;
+
+;     CONVERT 16 BIT INTEGER IN M1(HIGH) AND M1+1(LOW) TO F.P.
+;     RESULT IN EXP/MANT1.  EXP/MANT2 UNEFFECTED
+
+FLOAT:  LDA #$8E    ;
+        STA $15     ; SET EXPN TO 14 DEC
+        LDA #0      ; CLEAR LOW ORDER BYTE
+        STA $18     ;
+        BEQ NORM    ; NORMALIZE RESULT
+NORM1:  DEC $15     ; DECREMENT EXP1
+        ASL $18     ;
+        ROL $17     ; SHIFT MANT1 (3 BYTES) LEFT
+        ROL $16     ;
+NORM:   LDA $16     ; HIGH ORDER MANT1 BYTE
+        ASL         ; UPPER TWO BITS UNEQUAL?
+        EOR $16     ;
+        BMI RTS1    ; YES,RETURN WITH MANT1 NORMALIZED
+        LDA $15     ; EXP1 ZERO?
+        BNE NORM1   ; NO, CONTINUE NORMALIZING
+RTS1:   RTS         ; RETURN
+
+;     EXP/MANT2-EXP/MANT1 RESULT IN EXP/MANT1
+
+FSUB:   JSR FCOMPL  ; CMPL MANT1 CLEARS CARRY UNLESS ZERO
+SWPALG: JSR ALGNSW  ; RIGHT SHIFT MANT1 OR SWAP WITH MANT2 ON CARRY
+
+;     ADD EXP/MANT1 AND EXP/MANT2 RESULT IN EXP/MANT1
+
+FADD:   LDA $11     ;
+        CMP $15     ; COMPARE EXP1 WITH EXP2
+        BNE SWPALG  ; IF UNEQUAL, SWAP ADDENDS OR ALIGN MANTISSAS
+        JSR ADD     ; ADD ALIGNED MANTISSAS
+ADDEND: BVC NORM    ; NO OVERFLOW, NORMALIZE RESULTS
+        BVS RTLOG   ; OV: SHIFT MANT1 RIGHT. NOTE CARRY IS CORRECT SIGN
+ALGNSW: BCC SWAP    ; SWAP IF CARRY CLEAR, ELSE SHIFT RIGHT ARITH.
+RTAR:   LDA $16     ; SIGN OF MANT1 INTO CARRY FOR
+        ASL         ; RIGHT ARITH SHIFT
+RTLOG:  INC $15     ; INCR EXP1 TO COMPENSATE FOR RT SHIFT
+        BEQ OVFL    ; EXP1 OUT OF RANGE.
+RTLOG1: LDX #$FA    ; INDEX FOR 6 BYTE RIGHT SHIFT
+ROR1:   LDA #$80    ; 
+        BCS ROR2    ; 
+        ASL         ; 
+ROR2:   LSR $1C,X   ; SIMULATE ROR E+3,X
+        ORA $1C,X   ; 
+        STA $1C,X   ; 
+        INX         ; NEXT BYTE OF SHIFT
+        BNE ROR1    ; LOOP UNTIL DONE
+        RTS         ; RETURN
+
+;     EXP/MANT1 X EXP/MANT2 RESULT IN EXP/MANT1
+
+FMUL:   JSR MD1     ; ABS. VAL OF MANT1, MANT2
+        ADC $15     ; ADD EXP1 TO EXP2 FOR PRODUCT EXPONENT
+        JSR MD2     ; CHECK PRODUCT EXP AND PREPARE FOR MUL
+        CLC         ; CLEAR CARRY
+MUL1:   JSR RTLOG1  ; MANT1 AND E RIGHT.(PRODUCT AND MPLIER)
+        BCC MUL2    ; IF CARRY CLEAR, SKIP PARTIAL PRODUCT
+        JSR ADD     ; ADD MULTIPLICAN TO PRODUCT
+MUL2:   DEY         ; NEXT MUL ITERATION
+        BPL MUL1    ; LOOP UNTIL DONE
+MDEND:  LSR $10     ; TEST SIGN (EVEN/ODD)
+NORMX:  BCC NORM    ; IF EXEN, NORMALIZE PRODUCT, ELSE COMPLEMENT
+FCOMPL: SEC         ; SET CARRY FOR SUBTRACT
+        LDX #$03    ; INDEX FOR 3 BYTE SUBTRACTION
+COMPL1: LDA #$00    ; CLEAR A
+        SBC $15,X   ; SUBTRACT BYTE OF EXP1
+        STA $15,X   ; RESTORE IT
+        DEX         ; NEXT MORE SIGNIFICANT BYTE
+        BNE COMPL1  ; LOOP UNTIL DONE
+        BEQ ADDEND  ; NORMALIZE (OR SHIFT RIGHT IF OVERFLOW)
+
+;     EXP/MANT2 / EXP/MANT1 RESULT IN EXP/MANT1
+
+FDIV:   JSR MD1     ; TAKE ABS VAL OF MANT1, MANT2
+        SBC $15     ; SUBTRACT EXP1 FROM EXP2
+        JSR MD2     ; SAVE AS QUOTIENT EXP
+DIV1:   SEC         ; SET CARRY FOR SUBTRACT
+        LDX #$02    ; INDEX FOR 3-BYTE INSTRUCTION
+DIV2:   LDA $12,X   ; 
+        SBC $19,X   ; SUBTRACT A BYTE OF E FROM MANT2
+        PHA         ; SAVE ON STACK
+        DEX         ; NEXT MORE SIGNIF BYTE
+        BPL DIV2    ; LOOP UNTIL DONE
+        LDX #$FD    ; INDEX FOR 3-BYTE CONDITIONAL MOVE
+DIV3:   PLA         ; PULL A BYTE OF DIFFERENCE OFF STACK
+        BCC DIV4    ; IF MANT2<E THEN DONT RESTORE MANT2
+        STA $15,X   ; 
+DIV4:   INX         ; NEXT LESS SIGNIF BYTE
+        BNE DIV3    ; LOOP UNTIL DONE
+        ROL $18     ; 
+        ROL $17     ; ROLL QUOTIENT LEFT, CARRY INTO LSB
+        ROL $16     ; 
+        ASL $14     ; 
+        ROL $13     ; SHIFT DIVIDEND LEFT
+        ROL $12     ; 
+        BCS OVFL    ; OVERFLOW IS DUE TO UNNORMALIZED DIVISOR
+        DEY         ; NEXT DIVIDE ITERATION
+        BNE DIV1    ; LOOP UNTIL DONE 23 ITERATIONS
+        BEQ MDEND   ; NORMALIZE QUOTIENT AND CORRECT SIGN
+MD2:    STX $18     ; 
+        STX $17     ; CLR MANT1 (3 BYTES) FOR MUL/DIV
+        STX $16     ; 
+        BCS OVCHK   ; IF EXP CALC SET CARRY, CHECK FOR OVFL
+        BMI MD3     ; IF NEG NO UNDERFLOW
+        PLA         ; POP ONE
+        PLA         ; RETURN LEVEL
+        BCC NORMX   ; CLEAR X1 AND RETURN
+MD3:    EOR #$80    ; COMPLIMENT SIGN BIT OF EXP
+        STA $15     ; STORE IT
+        LDY #$17    ; COUNT FOR 24 MUL OR 23 DIV ITERATIONS
+        RTS         ; RETURN
+OVCHK:  BPL MD3     ; IF POS EXP THEN NO OVERFLOW
+OVFL:   JMP FAIL
+
+;     CONVERT EXP/MANT1 TO INTEGER IN M1 (HIGH) AND M1+1(LOW)
+;     EXP/MANT2 UNEFFECTED
+
+FIXJ:   JSR RTAR    ; SHIFT MANT1 RT AND INCREMENT EXPNT
+FIX:    LDA $15     ; CHECK EXPONENT
+        CMP #$8E    ; IS EXPONENT 14?
+        BNE FIXJ    ; NO, SHIFT
+RTRN:   RTS         ; RETURN
+        JMP EXIT
+FAIL:
+        LDY #$2
+        STY $21
+        LDY #00
+        STY $20
+        LDA #$2
+        PHA
+        FLOOP:
+          PLA
+          STA ($20),Y
+          PHA
+          CLC
+          LDA $20
+          ADC #1
+          STA $20
+          LDA $21
+          ADC #0
+          STA $21
+          CMP #$05
+          BCC FF_CHECK
+          LDA $20
+          CMP #$FF
+          BEQ EXIT
+          FF_CHECK:
+          JMP FLOOP
+EXIT:
