@@ -1,7 +1,7 @@
 ; Draws N number of lines using the Bresenham line drawing algorithm
 ; Author: Jennifer Teissler
 
-LDA #10 ; N number of lines (base-10, up to 255)
+LDA #255 ; N number of lines (base-10, up to 255)
 STA $50
 
 LDX #0

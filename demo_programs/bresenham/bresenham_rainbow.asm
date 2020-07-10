@@ -1,3 +1,7 @@
+; Draws a pattern of lines using the bresenham line algorithm, demonstrating
+; the implementation's line drawing capabilities
+; Author: Jennifer Teissler
+
 LDA #16 ; 1
 STA $00 
 LDA #16 

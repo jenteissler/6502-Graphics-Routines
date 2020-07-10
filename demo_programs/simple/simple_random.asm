@@ -289,7 +289,7 @@ twos_complement:
   ADC #0
   RTS
 
-; Extract from Dr.Dobb's Journal, August 1976 (pages 17-19)
+; Extract from Dr. Dobb's Journal, August 1976 (pages 17-19)
 ; Authors: Roy Rankin & Steve Wozniak
 ; Modified by Jennifer Teissler
 

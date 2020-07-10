@@ -13,7 +13,7 @@ text-field of the emulator. To run them just click "Assemble" then
 horizontal and vertical lines very slowly.
 
 -------------------------------------------------------------------
-INCLUDED FILES & DIRECTORIES
+INCLUDED ALGORITHMS & DEMOS
 
 > algorithms - contains the standalone line drawing algorithms as
                well as a library "fp.asm" for doing floating

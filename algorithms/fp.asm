@@ -168,7 +168,7 @@ FIX:    LDA $15     ; CHECK EXPONENT
         CMP #$8E    ; IS EXPONENT 14?
         BNE FIXJ    ; NO, SHIFT
 RTRN:   RTS         ; RETURN
-        JMP EXIT
+
 FAIL:
         LDY #$2
         STY $21
