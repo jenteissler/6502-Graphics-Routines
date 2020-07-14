@@ -7,6 +7,47 @@ define  MultLow   $0024 ; multiply A
 define  MultHigh  $0025 ; multiply B
 define  RowIndex  $0026 ; 
 
+LDX #1
+LDA #1
+STA $10
+LDA #2
+STA $11
+LDA #3
+STA $12
+LDA #1
+STA $13
+LDA #2
+STA $14
+LDA #3
+STA $15
+LDA #1
+STA $16
+LDA #2
+STA $17
+LDA #3
+STA $18
+LDA #1
+STA $19
+LDA #2
+STA $1a
+LDA #3
+STA $1b
+LDA #1
+STA $1c
+LDA #2
+STA $1d
+LDA #3
+STA $1e
+LDA #1
+STA $1f
+LDA #2
+STA $20
+LDA #3
+STA $21
+LDY #0
+LDX #0
+
+
 MATRIX_MULT: ; MatrixA x MatrixB -> MatrixA
   LDX #0
   JSR MM_ROW_MULT
@@ -32,7 +73,7 @@ MM_ROW_MULT: ; X = starting cell number
     STA MatrixA,X 
     DEX
     CPX RowIndex
-    BCS MMRM_SAVE
+    BPL MMRM_SAVE
   RTS
 
 MM_CELL_MULT: ; X = Matrix A Cell, Y = Matrix B Cell, A = Result
@@ -48,6 +89,7 @@ MM_CELL_MULT: ; X = Matrix A Cell, Y = Matrix B Cell, A = Result
     LDA MatrixB,Y
     STA MultHigh
     JSR MULT
+    LDA MultLow
     CLC
     ADC CellSum
     STA CellSum
@@ -55,23 +97,28 @@ MM_CELL_MULT: ; X = Matrix A Cell, Y = Matrix B Cell, A = Result
     INY
     CPX CellIndex
     BCC MMCM_LOOP
+    BEQ MMCM_LOOP
   LDA CellSum
   RTS
 
 MULT: ; MultLow x MultHigh = MultHigh MultLow
+  TXA
+  PHA
   LDA #0
   LDX #8
-  LSR MLTA
+  LSR MultLow
   M_L1:
   BCC M_L2
   CLC
-  ADC MLTB
+  ADC MultHigh
   M_L2:
   ROR
-  ROR MLTA
+  ROR MultLow
   DEX
   BNE M_L1
-  STA MLTB
+  STA MultHigh
+  PLA
+  TAX
   RTS
 
   EXIT:
