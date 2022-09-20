@@ -1,5 +1,8 @@
 6502 Line Drawing Graphics routines
 Author: Jennifer Teissler
+
+![](https://i.imgur.com/5GdJf5B.gif)
+
 --------------------------------------------------------------------
 WHERE TO RUN THE CODE
 
